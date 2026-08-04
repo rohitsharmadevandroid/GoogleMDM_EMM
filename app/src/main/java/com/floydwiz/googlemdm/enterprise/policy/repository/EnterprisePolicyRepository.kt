@@ -1,0 +1,3 @@
+package com.floydwiz.googlemdm.enterprise.policy.repository
+
+interface EnterprisePolicyRepository
