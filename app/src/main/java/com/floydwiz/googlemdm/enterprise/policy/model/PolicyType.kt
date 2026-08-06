@@ -10,5 +10,8 @@ enum class PolicyType{
     NFC,
     FACTORY_RESET,
     SAFE_BOOT,
-    INSTALL_UNKNOWN_APPS
+    INSTALL_UNKNOWN_APPS,
+    ADD_USER,
+    OUTGOING_CALLS,
+    SMS
 }

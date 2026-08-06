@@ -83,17 +83,10 @@ fun DashboardScreen(
             PolicyToggleCard(
                 policy = policy,
                 onToggle = { enabled ->
-                    when (policy.type) {
-                        PolicyType.CAMERA ->
-                            viewModel.setCameraDisabled(enabled)
-                        PolicyType.SCREEN_CAPTURE -> {
-                            // TODO
-                        }
-                        PolicyType.USB_FILE_TRANSFER -> {
-                            // TODO
-                        }
-                        else -> Unit
-                    }
+                    viewModel.setPolicy(
+                        policy.type,
+                        enabled
+                    )
                 }
             )
         }

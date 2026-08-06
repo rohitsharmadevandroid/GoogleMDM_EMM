@@ -14,6 +14,5 @@ data class DashboardUiState(
     val model: String = "",
     val androidVersion: String = "",
 
-    val policyState: PolicyUiState = PolicyUiState(),
     val policies: List<EnterprisePolicy> = emptyList(),
 )
