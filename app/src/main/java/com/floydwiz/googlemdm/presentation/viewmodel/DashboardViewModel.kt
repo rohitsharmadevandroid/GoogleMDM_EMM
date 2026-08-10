@@ -2,9 +2,16 @@ package com.floydwiz.googlemdm.presentation.viewmodel
 
 import android.content.Intent
 import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import com.floydwiz.googlemdm.core.logger.Logger
 import com.floydwiz.googlemdm.enterprise.admin.manager.DeviceAdminManager
+import com.floydwiz.googlemdm.enterprise.kiosk.manager.KioskManager
+import com.floydwiz.googlemdm.enterprise.network.handler.NetworkPolicyHandler
+import com.floydwiz.googlemdm.enterprise.network.manager.NetworkManager
+import com.floydwiz.googlemdm.enterprise.network.model.NetworkPolicyType
+import com.floydwiz.googlemdm.enterprise.network.model.NetworkState
+import com.floydwiz.googlemdm.enterprise.policy.handler.PolicyHandler
 import com.floydwiz.googlemdm.enterprise.policy.manager.EnterprisePolicyManager
 import com.floydwiz.googlemdm.enterprise.policy.model.PolicyType
 import com.floydwiz.googlemdm.enterprise.policy.registry.PolicyDefinitions
@@ -16,10 +23,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
+@RequiresApi(Build.VERSION_CODES.O)
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val deviceAdminManager: DeviceAdminManager,
-    private val enterprisePolicyManager: EnterprisePolicyManager
+    //private val enterprisePolicyManager: EnterprisePolicyManager,
+    private val kioskManager: KioskManager,
+    private val policyHandler: PolicyHandler,
+    private val networkPolicyHandler: NetworkPolicyHandler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -30,49 +41,48 @@ class DashboardViewModel @Inject constructor(
         loadDeviceStatus()
     }
 
+    private fun updatePolicyState(
+        type: PolicyType,
+        disabled: Boolean
+    ){
+        _uiState.update { state ->
+            state.copy(
+                policies = state.policies.map { policy ->
+                    if (policy.type == type) {
+                        policy.copy(enabled = disabled)
+                    }
+                    else {
+                        policy
+                    }
+                }
+            )
+        }
+    }
+
     fun loadDeviceStatus() {
         _uiState.value = _uiState.value.copy(isLoading = true)
         try {
-            val cameraDisabled = enterprisePolicyManager.getCameraDisabled()
-            val screenCaptureDisabled = enterprisePolicyManager.getScreenCaptureDisabled()
-            val usbFileTransferDisabled = enterprisePolicyManager.getUsbFileTransferDisabled()
-            val safeBootDisabled = enterprisePolicyManager.getSafeBootDisabled()
-            val factoryResetDisabled = enterprisePolicyManager.getFactoryResetDisabled()
-            val addUserDisabled = enterprisePolicyManager.getAddUserDisabled()
-            val outgoingCallsDisabled = enterprisePolicyManager.getOutgoingCallDisabled()
-            val smsDisabled = enterprisePolicyManager.getSMSDisabled()
-            val policies = listOf(
+            val kioskEnabled = kioskManager.isKioskModeEnabled()
+            val networkState = NetworkState(
+                isWifiEnabled = networkPolicyHandler.getNetworkState()
+            )
+            Logger.d("Dashboard Wi-Fi state = ${networkState.isWifiEnabled}")
+            val wifiConfigDisabled = networkPolicyHandler.getPolicy(NetworkPolicyType.WIFI)
+            Logger.d("Dashboard Wi-Fi config disabled = $wifiConfigDisabled")
+
+            val policies = PolicyDefinitions.all
+                .map { definition ->
+                    PolicyDefinitions.createPolicy(
+                        definition = definition,
+                        enabled = policyHandler.getPolicy(definition.type)
+                    )
+                }
+                .toMutableList()
+
+            policies.add(
                 PolicyDefinitions.createPolicy(
-                    PolicyDefinitions.Camera,
-                    cameraDisabled
-                ),
-                PolicyDefinitions.createPolicy(
-                    PolicyDefinitions.ScreenCapture,
-                    screenCaptureDisabled
-                ),
-                PolicyDefinitions.createPolicy(
-                    PolicyDefinitions.UsbFileTransfer,
-                    usbFileTransferDisabled
-                ),
-                PolicyDefinitions.createPolicy(
-                    PolicyDefinitions.SafeBoot,
-                    safeBootDisabled
-                ),
-                PolicyDefinitions.createPolicy(
-                    PolicyDefinitions.FactoryReset,
-                    factoryResetDisabled
-                ),
-                PolicyDefinitions.createPolicy(
-                    PolicyDefinitions.addUser,
-                    addUserDisabled
-                ),
-                PolicyDefinitions.createPolicy(
-                    PolicyDefinitions.outgoingCalls,
-                    outgoingCallsDisabled
-                ),
-                PolicyDefinitions.createPolicy(
-                    PolicyDefinitions.SMS,
-                    smsDisabled
+                    definition = PolicyDefinitions.KIOSK,
+                    enabled = kioskEnabled
                 )
             )
             _uiState.value = DashboardUiState(
@@ -85,7 +95,9 @@ class DashboardViewModel @Inject constructor(
 
                 isLoading = false,
 
-                policies = policies
+                policies = policies,
+                networkState = networkState,
+                isWifiConfigDisabled = wifiConfigDisabled
             )
         } catch (e: Exception) {
             _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
@@ -97,162 +109,45 @@ class DashboardViewModel @Inject constructor(
         return deviceAdminManager.createAdminIntent()
     }
 
-    fun setPolicy(type: PolicyType, enabled: Boolean) {
-        when (type) {
-            PolicyType.CAMERA -> setCameraDisabled(enabled)
-            PolicyType.SCREEN_CAPTURE -> setScreenCaptureDisabled(enabled)
-            PolicyType.USB_FILE_TRANSFER -> setUsbFileTransferDisabled(enabled)
-            PolicyType.SAFE_BOOT -> setSafeBootDisabled(enabled)
-            PolicyType.FACTORY_RESET -> setFactoryResetDisabled(enabled)
-            PolicyType.ADD_USER -> setAddUserDisabled(enabled)
-            PolicyType.OUTGOING_CALLS -> setOutgoingCallsDisabled(enabled)
-            PolicyType.SMS -> setSMSDisabled(enabled)
-            else -> {}
+    fun setPolicy(
+        type: PolicyType,
+        enabled: Boolean
+    ) {
+        if (type == PolicyType.KIOSK)
+        {
+            if(enabled) {
+                enabledKioskMode()
+            } else {
+                disabledKioskMode()
+            }
+            return
+        }
+
+        if(policyHandler.setPolicy(type, enabled))
+        {
+            updatePolicyState(type, enabled)
         }
     }
 
-    fun setCameraDisabled(disabled: Boolean) {
-        val success = enterprisePolicyManager.setCameraDisabled(disabled)
-
-        if(success) {
-            _uiState.update { state ->
-                state.copy(
-                    policies = state.policies.map { policy ->
-                        if (policy.type == PolicyType.CAMERA) {
-                            policy.copy(enabled = disabled)
-                        }
-                        else {
-                            policy
-                        }
-                    }
-                )
-            }
+    //Kiosk Mode
+    fun enabledKioskMode() {
+        if(kioskManager.enabledKioskMode( )) {
+            updatePolicyState(PolicyType.KIOSK, true)
         }
     }
 
-    fun setScreenCaptureDisabled(disabled: Boolean) {
-        val success = enterprisePolicyManager.setScreenCaptureDisabled(disabled)
-
-        if (success) {
-            _uiState.update { state ->
-                state.copy(
-                    policies = state.policies.map { policy ->
-                        if (policy.type == PolicyType.SCREEN_CAPTURE) {
-                            policy.copy(enabled = disabled)
-                        } else {
-                            policy
-                        }
-                    }
-                )
-            }
+    fun disabledKioskMode() {
+        if(kioskManager.disabledKioskMode()) {
+            updatePolicyState(PolicyType.KIOSK, false)
         }
     }
 
-    fun setUsbFileTransferDisabled(disabled: Boolean) {
-        val success = enterprisePolicyManager.setUsbFileTransferDisabled(disabled)
-
-        if (success) {
-            _uiState.update { state ->
-                state.copy(
-                    policies = state.policies.map { policy ->
-                        if (policy.type == PolicyType.USB_FILE_TRANSFER) {
-                            policy.copy(enabled = disabled)
-                        } else {
-                            policy
-                        }
-                    }
-                )
-            }
-        }
-    }
-
-    fun setSafeBootDisabled(disabled: Boolean) {
-        val success = enterprisePolicyManager.setSafeBootDisabled(disabled)
-
-        if (success) {
-            _uiState.update { state ->
-                state.copy(
-                    policies = state.policies.map { policy ->
-                        if (policy.type == PolicyType.SAFE_BOOT) {
-                            policy.copy(enabled = disabled)
-                        } else {
-                            policy
-                        }
-                    }
-                )
-            }
-        }
-    }
-
-    fun setFactoryResetDisabled(disabled: Boolean) {
-        val success = enterprisePolicyManager.setFactoryResetDisabled(disabled)
-
-        if (success) {
-            _uiState.update { state ->
-                state.copy(
-                    policies = state.policies.map { policy ->
-                        if (policy.type == PolicyType.FACTORY_RESET) {
-                            policy.copy(enabled = disabled)
-                        } else {
-                            policy
-                        }
-                    }
-                )
-            }
-        }
-    }
-
-    fun setAddUserDisabled(disabled: Boolean) {
-        val success = enterprisePolicyManager.setAddUserDisabled(disabled)
-
-        if (success) {
-            _uiState.update { state ->
-                state.copy(
-                    policies = state.policies.map { policy ->
-                        if (policy.type == PolicyType.ADD_USER) {
-                            policy.copy(enabled = disabled)
-                        } else {
-                            policy
-                        }
-                    }
-                )
-            }
-        }
-    }
-
-    fun setOutgoingCallsDisabled(disabled: Boolean) {
-        val success = enterprisePolicyManager.setOutgoingCallDisabled(disabled)
-
-        if (success) {
-            _uiState.update { state ->
-                state.copy(
-                    policies = state.policies.map { policy ->
-                        if (policy.type == PolicyType.OUTGOING_CALLS) {
-                            policy.copy(enabled = disabled)
-                        } else {
-                            policy
-                        }
-                    }
-                )
-            }
-        }
-    }
-
-    fun setSMSDisabled(disabled: Boolean) {
-        val success = enterprisePolicyManager.setSMSDisabled(disabled)
-
-        if(success) {
-            _uiState.update { state ->
-                state.copy(
-                    policies = state.policies.map { policy ->
-                        if (policy.type == PolicyType.SMS) {
-                            policy.copy(enabled = disabled)
-                        } else {
-                            policy
-                        }
-                    }
-                )
-            }
+    fun setNetworkPolicy(
+        type: NetworkPolicyType,
+        disabled: Boolean
+    ) {
+        if(networkPolicyHandler.setPolicy(type, disabled)) {
+            loadDeviceStatus()
         }
     }
 }

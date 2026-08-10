@@ -51,7 +51,7 @@ class DeviceAdminManager @Inject constructor(
             Logger.e("Failed to change user restriction")
             false
         } catch (e: Exception) {
-            Logger.e("Unexpected error occurred while changing user restriction")
+            Logger.e("Unexpected error occurred while changing user restriction: $restriction")
             false
         }
     }
@@ -70,19 +70,38 @@ class DeviceAdminManager @Inject constructor(
         } catch (e: SecurityException) {
             Logger.e("Failed to read user restriction")
             false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while reading user restriction: $restriction")
+            false
         }
     }
 
     fun isAdminActive(): Boolean {
-        val active = dpm.isAdminActive(adminComponent)
-        Logger.d("Admin Active = $active")
-        return active
+        return try {
+            val active = dpm.isAdminActive(adminComponent)
+            Logger.d("Device Admin Active = $active")
+            active
+        } catch (e: SecurityException) {
+            Logger.e("Failed to check device admin status")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while checking device admin status")
+            false
+        }
     }
 
     fun isDeviceOwner(): Boolean {
-        val owner = dpm.isDeviceOwnerApp(context.packageName)
-        Logger.d("Device Owner = $owner")
-        return owner
+        return try {
+            val owner = dpm.isDeviceOwnerApp(context.packageName)
+            Logger.d("Device Owner = $owner")
+            owner
+        } catch (e: SecurityException) {
+            Logger.e("Failed to check Device Owner status")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while checking Device Owner status")
+            false
+        }
     }
 
     fun getAdminComponent(): ComponentName {
@@ -123,9 +142,17 @@ class DeviceAdminManager @Inject constructor(
             return false
         }
 
-        val disabled = dpm.getCameraDisabled(adminComponent)
-        Logger.d("Camera Disabled Status = $disabled")
-        return disabled
+        return try {
+            val disabled = dpm.getCameraDisabled(adminComponent)
+            Logger.d("Camera Disabled Status = $disabled")
+            disabled
+        } catch (e: SecurityException) {
+            Logger.e("Failed to read camera policy")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while reading camera policy")
+            false
+        }
     }
 
     fun setScreenCaptureDisabled(disabled: Boolean): Boolean {
@@ -153,9 +180,17 @@ class DeviceAdminManager @Inject constructor(
         {
             return false
         }
-        val disabled = dpm.getScreenCaptureDisabled(adminComponent)
-        Logger.d("Screen Capture Disabled Status = $disabled")
-        return disabled
+        return try {
+            val disabled = dpm.getScreenCaptureDisabled(adminComponent)
+            Logger.d("Screen Capture Disabled Status = $disabled")
+            disabled
+        } catch (e: SecurityException) {
+            Logger.e("Failed to read screen capture policy")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while reading screen capture policy")
+            false
+        }
     }
 
     fun setUsbFileTransferDisabled(disabled: Boolean): Boolean {
@@ -233,6 +268,92 @@ class DeviceAdminManager @Inject constructor(
     fun getSMSDisabled(): Boolean {
         return getUserRestriction(
             UserManager.DISALLOW_SMS
+        )
+    }
+
+    //Kiosk Mode Started here
+    fun setLockTaskPackages(
+        packages: List<String>
+    ): Boolean {
+        if(!isDeviceOwner()) {
+            Logger.e("Cannot set Lock Task Packages. App is not Device Owner")
+            return false
+        }
+
+        return try {
+            dpm.setLockTaskPackages(
+                adminComponent,
+                packages.toTypedArray()
+            )
+            Logger.d("Lock Task Packages set: $packages")
+            true
+        } catch (e: Exception) {
+            Logger.e("Failed to set Lock Task Packages")
+            false
+        }
+    }
+
+    fun getLockTaskPackages(): Array<String> {
+        return try {
+            val packages = dpm.getLockTaskPackages(adminComponent)
+            Logger.d("Lock Task Packages: $packages")
+            packages
+        } catch (e: SecurityException) {
+            Logger.e("Failed to read Lock Task Packages")
+            emptyArray()
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while reading Lock Task Packages")
+            emptyArray()
+        }
+    }
+
+    fun isLockTaskPermitted(
+        packageName: String
+    ): Boolean {
+        return try {
+            val permitted = dpm.isLockTaskPermitted(packageName)
+
+            Logger.d("Lock Task permitted for $packageName = $permitted")
+
+            permitted
+        } catch (e: SecurityException) {
+            Logger.e("Failed to check Lock Task permission")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while checking Lock Task permission")
+            false
+        }
+    }
+
+    fun clearLockTaskPackages(): Boolean {
+        if(!isDeviceOwner()) {
+            Logger.e("Cannot clear Lock Task Packages. App is Not Device Owner")
+            return false
+        }
+
+        return try {
+            dpm.setLockTaskPackages(
+                adminComponent,
+                emptyArray()
+            )
+            Logger.d("Lock Task Packages cleared")
+            true
+        } catch (e: Exception) {
+            Logger.e("Failed to load Lock Task Packages")
+            false
+        }
+    }
+
+    fun setWifiConfigDisabled(disabled: Boolean):Boolean {
+        return setUserRestriction(
+            UserManager.DISALLOW_CONFIG_WIFI,
+            disabled
+        )
+    }
+
+    fun getWifiConfigDisabled(): Boolean{
+        return getUserRestriction(
+            UserManager.DISALLOW_CONFIG_WIFI
         )
     }
 }

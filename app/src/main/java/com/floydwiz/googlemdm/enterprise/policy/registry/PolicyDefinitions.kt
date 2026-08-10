@@ -18,31 +18,31 @@ object PolicyDefinitions {
         )
     }
 
-    val Camera = EnterprisePolicyDefinition(
+    val camera = EnterprisePolicyDefinition(
         type = PolicyType.CAMERA,
         title = "Disabled Camera",
         description = "Prevent users from accessing the device camera"
     )
 
-    val ScreenCapture = EnterprisePolicyDefinition (
+    val screenCapture = EnterprisePolicyDefinition (
         type = PolicyType.SCREEN_CAPTURE,
         title = "Disable Screen Capture",
         description = "Prevent users from capturing the device screen"
     )
 
-    val UsbFileTransfer = EnterprisePolicyDefinition (
+    val usbFileTransfer = EnterprisePolicyDefinition (
         type = PolicyType.USB_FILE_TRANSFER,
         title = "Disable USB File Transfer",
         description = "Prevent users from transferring files over USB"
     )
 
-    val SafeBoot = EnterprisePolicyDefinition (
+    val safeBoot = EnterprisePolicyDefinition (
         type = PolicyType.SAFE_BOOT,
         title = "Disable Safe Boot",
         description = "Prevent users from booting the device into recovery mode"
     )
 
-    val FactoryReset = EnterprisePolicyDefinition (
+    val factoryReset = EnterprisePolicyDefinition (
         type = PolicyType.FACTORY_RESET,
         title = "Disable Factory Reset",
         description = "Prevent users from resetting the device to its factory settings"
@@ -64,5 +64,22 @@ object PolicyDefinitions {
         type = PolicyType.SMS,
         title = "Disable SMS",
         description = "Prevent users from sending SMS messages"
+    )
+
+    val KIOSK = EnterprisePolicyDefinition (
+        type = PolicyType.KIOSK,
+        title = "Kiosk Mode",
+        description = "Lock the device into a controlled kiosk environment"
+    )
+
+    val all = listOf(
+        camera,
+        screenCapture,
+        usbFileTransfer,
+        safeBoot,
+        factoryReset,
+        addUser,
+        outgoingCalls,
+        SMS
     )
 }

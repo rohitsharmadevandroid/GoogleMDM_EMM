@@ -1,7 +1,9 @@
 package com.floydwiz.googlemdm.presentation.screens.dashboard
 
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -19,15 +21,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.floydwiz.googlemdm.core.logger.Logger
+import com.floydwiz.googlemdm.enterprise.kiosk.KioskController
+import com.floydwiz.googlemdm.enterprise.network.model.NetworkPolicyType
+import com.floydwiz.googlemdm.enterprise.policy.model.EnterprisePolicy
 import com.floydwiz.googlemdm.enterprise.policy.model.PolicyType
 import com.floydwiz.googlemdm.presentation.components.cards.DeviceInformationCard
 import com.floydwiz.googlemdm.presentation.components.cards.EnterpriseStatusCard
+import com.floydwiz.googlemdm.presentation.components.cards.NetworkCard
 import com.floydwiz.googlemdm.presentation.components.cards.QuickActionCard
+import com.floydwiz.googlemdm.presentation.components.network.NetworkToggleCard
 import com.floydwiz.googlemdm.presentation.components.policy.PolicyToggleCard
 import com.floydwiz.googlemdm.presentation.viewmodel.DashboardViewModel
 
 @Composable
 fun DashboardScreen(
+    kioskController: KioskController,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -68,6 +76,28 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
         item {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Network",
+                style = MaterialTheme.typography.titleLarge
+            )
+        }
+
+        item {
+            NetworkToggleCard(
+                title = "Disable Wi-Fi Configuration",
+                description = "Prevent users from changing Wi-Fi configuration",
+                enabled = uiState.isWifiConfigDisabled,
+                onToggle = { disabled ->
+                    viewModel.setNetworkPolicy(
+                        NetworkPolicyType.WIFI,
+                        disabled
+                    )
+                }
+            )
+        }
+        item {
             QuickActionCard(
                 isAdminActive = uiState.isAdminActive,
                 onActivateAdmin = {
@@ -83,10 +113,20 @@ fun DashboardScreen(
             PolicyToggleCard(
                 policy = policy,
                 onToggle = { enabled ->
-                    viewModel.setPolicy(
-                        policy.type,
-                        enabled
-                    )
+                    if(policy.type == PolicyType.KIOSK) {
+                       if (enabled) {
+                           viewModel.enabledKioskMode()
+                           kioskController.startKiosk()
+                       } else {
+                           kioskController.stopKiosk()
+                           viewModel.disabledKioskMode()
+                       }
+                    }   else {
+                        viewModel.setPolicy(
+                            policy.type,
+                            enabled
+                        )
+                    }
                 }
             )
         }

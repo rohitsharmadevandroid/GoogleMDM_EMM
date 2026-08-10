@@ -1,5 +1,6 @@
 package com.floydwiz.googlemdm.presentation.state
 
+import com.floydwiz.googlemdm.enterprise.network.model.NetworkState
 import com.floydwiz.googlemdm.enterprise.policy.model.EnterprisePolicy
 
 data class DashboardUiState(
@@ -15,4 +16,9 @@ data class DashboardUiState(
     val androidVersion: String = "",
 
     val policies: List<EnterprisePolicy> = emptyList(),
+
+    val isKioskModeEnabled: Boolean = false,
+
+    val networkState: NetworkState = NetworkState(),
+    val isWifiConfigDisabled: Boolean = false
 )
