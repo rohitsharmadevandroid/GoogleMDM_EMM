@@ -29,6 +29,7 @@ import com.floydwiz.googlemdm.presentation.components.cards.DeviceInformationCar
 import com.floydwiz.googlemdm.presentation.components.cards.EnterpriseStatusCard
 import com.floydwiz.googlemdm.presentation.components.cards.NetworkCard
 import com.floydwiz.googlemdm.presentation.components.cards.QuickActionCard
+import com.floydwiz.googlemdm.presentation.components.enrollment.EnrollmentStatusCard
 import com.floydwiz.googlemdm.presentation.components.network.NetworkToggleCard
 import com.floydwiz.googlemdm.presentation.components.policy.PolicyToggleCard
 import com.floydwiz.googlemdm.presentation.viewmodel.DashboardViewModel
@@ -65,6 +66,12 @@ fun DashboardScreen(
                 manufacturer = uiState.manufacture,
                 model = uiState.model,
                 androidVersion = uiState.androidVersion
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            EnrollmentStatusCard(
+                state = uiState.enrollmentState
             )
             Spacer(modifier = Modifier.height(16.dp))
         }

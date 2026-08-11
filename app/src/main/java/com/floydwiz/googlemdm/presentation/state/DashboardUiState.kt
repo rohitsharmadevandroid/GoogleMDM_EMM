@@ -1,5 +1,6 @@
 package com.floydwiz.googlemdm.presentation.state
 
+import com.floydwiz.googlemdm.enterprise.enrollment.model.EnrollmentState
 import com.floydwiz.googlemdm.enterprise.network.model.NetworkState
 import com.floydwiz.googlemdm.enterprise.policy.model.EnterprisePolicy
 
@@ -20,5 +21,7 @@ data class DashboardUiState(
     val isKioskModeEnabled: Boolean = false,
 
     val networkState: NetworkState = NetworkState(),
-    val isWifiConfigDisabled: Boolean = false
+    val isWifiConfigDisabled: Boolean = false,
+
+    val enrollmentState: EnrollmentState = EnrollmentState.NOT_ENROLLED
 )

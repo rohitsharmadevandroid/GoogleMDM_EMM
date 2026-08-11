@@ -84,4 +84,7 @@ dependencies {
 
     //OkHttp
     implementation("com.squareup.okhttp3:logging-interceptor:5.1.0")
+
+    //Android Management API SDK
+    implementation("com.google.android.libraries.enterprise.amapi:amapi:1.8.2")
 }

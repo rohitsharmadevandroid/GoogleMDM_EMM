@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="MainActivity">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-08-03T13:25:35.234054672Z">
+        <DropdownSelection timestamp="2026-08-11T09:51:55.689971233Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="Default" identifier="serial=192.168.21.211:5555;connection=ae47f08c" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=/home/rohit-sharma/.android/avd/mdm_test.avd" />
             </handle>
           </Target>
         </DropdownSelection>

@@ -4,8 +4,11 @@ import android.content.Intent
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.floydwiz.googlemdm.core.logger.Logger
 import com.floydwiz.googlemdm.enterprise.admin.manager.DeviceAdminManager
+import com.floydwiz.googlemdm.enterprise.enrollment.handler.EnrollmentHandler
+import com.floydwiz.googlemdm.enterprise.enrollment.manager.AmapiEnvironmentManager
 import com.floydwiz.googlemdm.enterprise.kiosk.manager.KioskManager
 import com.floydwiz.googlemdm.enterprise.network.handler.NetworkPolicyHandler
 import com.floydwiz.googlemdm.enterprise.network.manager.NetworkManager
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -30,7 +34,9 @@ class DashboardViewModel @Inject constructor(
     //private val enterprisePolicyManager: EnterprisePolicyManager,
     private val kioskManager: KioskManager,
     private val policyHandler: PolicyHandler,
-    private val networkPolicyHandler: NetworkPolicyHandler
+    private val networkPolicyHandler: NetworkPolicyHandler,
+    private val enrollmentHandler: EnrollmentHandler,
+    private val amapiEnvironmentManager: AmapiEnvironmentManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -39,6 +45,8 @@ class DashboardViewModel @Inject constructor(
 
     init {
         loadDeviceStatus()
+
+        prepareAmapiEnvironment()
     }
 
     private fun updatePolicyState(
@@ -76,8 +84,10 @@ class DashboardViewModel @Inject constructor(
                         definition = definition,
                         enabled = policyHandler.getPolicy(definition.type)
                     )
-                }
-                .toMutableList()
+                }.toMutableList()
+
+            val enrollmentState = enrollmentHandler.getEnrollmentState()
+            Logger.d("Dashboard Enrollment State = $enrollmentState")
 
             policies.add(
                 PolicyDefinitions.createPolicy(
@@ -97,7 +107,9 @@ class DashboardViewModel @Inject constructor(
 
                 policies = policies,
                 networkState = networkState,
-                isWifiConfigDisabled = wifiConfigDisabled
+                isWifiConfigDisabled = wifiConfigDisabled,
+
+                enrollmentState = enrollmentState
             )
         } catch (e: Exception) {
             _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
@@ -148,6 +160,43 @@ class DashboardViewModel @Inject constructor(
     ) {
         if(networkPolicyHandler.setPolicy(type, disabled)) {
             loadDeviceStatus()
+        }
+    }
+
+    //Enrollment AMAPI Function
+    fun prepareAmapiEnvironment() {
+        viewModelScope.launch {
+
+            Logger.d("Starting AMAPI Environment preparation")
+
+            val response =
+                amapiEnvironmentManager.prepareEnvironment()
+
+            if (response != null) {
+
+                Logger.d(
+                    "AMAPI Prepare Environment Status = ${response.environment}"
+                )
+
+                val environmentReady =
+                    amapiEnvironmentManager.getEnvironment()
+
+                if (environmentReady) {
+                    Logger.d(
+                        "AMAPI Environment check successfully"
+                    )
+                } else {
+                    Logger.e(
+                        "AMAPI Environment check failed after preparation"
+                    )
+                }
+
+            } else {
+
+                Logger.e(
+                    "AMAPI Environment preparation failed"
+                )
+            }
         }
     }
 }

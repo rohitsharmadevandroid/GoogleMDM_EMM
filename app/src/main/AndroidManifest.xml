@@ -4,6 +4,11 @@
 
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
 
+    <!-- Google requires a <queries> entry so the app can interact with Android Device Policy -->
+    <queries>
+        <package android:name="com.google.android.app.work.clouddpc" />
+    </queries>
+
     <application
         android:name=".enterprise.appmanagement.GoogleMdmApplication"
         android:allowBackup="true"
