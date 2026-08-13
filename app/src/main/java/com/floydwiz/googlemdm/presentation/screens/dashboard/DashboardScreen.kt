@@ -37,7 +37,8 @@ import com.floydwiz.googlemdm.presentation.viewmodel.DashboardViewModel
 @Composable
 fun DashboardScreen(
     kioskController: KioskController,
-    viewModel: DashboardViewModel = hiltViewModel()
+    viewModel: DashboardViewModel = hiltViewModel(),
+    onEnrollmentClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val launcher = rememberLauncherForActivityResult(

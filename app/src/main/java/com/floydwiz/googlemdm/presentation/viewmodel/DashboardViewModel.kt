@@ -36,7 +36,7 @@ class DashboardViewModel @Inject constructor(
     private val policyHandler: PolicyHandler,
     private val networkPolicyHandler: NetworkPolicyHandler,
     private val enrollmentHandler: EnrollmentHandler,
-    private val amapiEnvironmentManager: AmapiEnvironmentManager
+    //private val amapiEnvironmentManager: AmapiEnvironmentManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -45,8 +45,6 @@ class DashboardViewModel @Inject constructor(
 
     init {
         loadDeviceStatus()
-
-        prepareAmapiEnvironment()
     }
 
     private fun updatePolicyState(
@@ -164,7 +162,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     //Enrollment AMAPI Function
-    fun prepareAmapiEnvironment() {
+    /*fun prepareAmapiEnvironment() {
         viewModelScope.launch {
 
             Logger.d("Starting AMAPI Environment preparation")
@@ -178,19 +176,6 @@ class DashboardViewModel @Inject constructor(
                     "AMAPI Prepare Environment Status = ${response.environment}"
                 )
 
-                val environmentReady =
-                    amapiEnvironmentManager.getEnvironment()
-
-                if (environmentReady) {
-                    Logger.d(
-                        "AMAPI Environment check successfully"
-                    )
-                } else {
-                    Logger.e(
-                        "AMAPI Environment check failed after preparation"
-                    )
-                }
-
             } else {
 
                 Logger.e(
@@ -198,5 +183,5 @@ class DashboardViewModel @Inject constructor(
                 )
             }
         }
-    }
+    }*/
 }

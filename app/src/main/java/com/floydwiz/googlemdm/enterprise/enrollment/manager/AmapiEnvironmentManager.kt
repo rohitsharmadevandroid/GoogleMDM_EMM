@@ -2,6 +2,7 @@ package com.floydwiz.googlemdm.enterprise.enrollment.manager
 
 import android.content.ComponentName
 import android.content.Context
+import com.google.android.managementapi.environment.model.Environment
 import com.floydwiz.googlemdm.core.logger.Logger
 import com.floydwiz.googlemdm.enterprise.admin.receiver.MyDeviceAdminReceiver
 import com.google.android.managementapi.common.model.Role
@@ -20,7 +21,7 @@ class AmapiEnvironmentManager @Inject constructor(
 ) {
     private val environmentClient: EnvironmentClient = EnvironmentClientFactory.create(context)
 
-    suspend fun getEnvironment(): Boolean {
+    suspend fun getEnvironment(): Environment? {
         return try {
             val role = Role.builder()
                 .setRoleType(
@@ -35,10 +36,10 @@ class AmapiEnvironmentManager @Inject constructor(
             val environment = environmentClient.getEnvironment(request)
 
             Logger.d("AMAPI Environment received: $environment")
-            true
+            environment
         } catch (e: Exception) {
             Logger.e("Failed to get AMAPI Environment: ${e.message}")
-            false
+            null
         }
     }
 
@@ -68,18 +69,7 @@ class AmapiEnvironmentManager @Inject constructor(
                 request,
                 null
             )
-            val environment =
-                response.environment
-
-            val adpEnvironment =
-                environment.androidDevicePolicyEnvironment
-
-            Logger.d(
-                "AMAPI Prepare Environment State = ${adpEnvironment.state}"
-            )
-            Logger.d(
-                "AMAPI Prepare Environment Version = ${adpEnvironment.version}"
-            )
+            Logger.d("AMAPI Environment preparation response = $response")
             response
         } catch (e: Exception) {
             Logger.e("Failed to prepare AMAPI Environment: $e.message")
