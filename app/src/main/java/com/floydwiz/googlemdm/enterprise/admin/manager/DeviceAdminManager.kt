@@ -4,12 +4,19 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.UserManager
+import com.floydwiz.googlemdm.BuildConfig
 import com.floydwiz.googlemdm.core.logger.Logger
 import com.floydwiz.googlemdm.enterprise.admin.receiver.MyDeviceAdminReceiver
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import java.io.FileNotFoundException
+import java.util.concurrent.Executor
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
 
 @Singleton
 class DeviceAdminManager @Inject constructor(
@@ -24,6 +31,7 @@ class DeviceAdminManager @Inject constructor(
         )
 
     private fun setUserRestriction(
+
         restriction: String,
         disabled: Boolean
     ): Boolean {
@@ -355,5 +363,303 @@ class DeviceAdminManager @Inject constructor(
         return getUserRestriction(
             UserManager.DISALLOW_CONFIG_WIFI
         )
+    }
+
+    /**
+     * Trusts a CA certificate device-wide. Device owners can do this without
+     * any user interaction, unlike the Settings > Install a certificate flow.
+     */
+    fun installCaCertificate(certBytes: ByteArray): Boolean {
+        if (!isDeviceOwner()) {
+            Logger.e("Cannot install CA certificate. App is not Device Owner")
+            return false
+        }
+
+        return try {
+            val installed = dpm.installCaCert(adminComponent, certBytes)
+            Logger.i("CA certificate install result = $installed")
+            installed
+        } catch (e: SecurityException) {
+            Logger.e("Failed to install CA certificate: ${e.message}")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while installing CA certificate: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Debug-build-only convenience: installs the local EMM backend's dev CA
+     * certificate (app/src/debug/assets/emm_dev_cert.der), so the local dev
+     * TLS setup doesn't depend on the Settings > Install a certificate flow,
+     * which is unreliable on several Android 13+ builds. The asset does not
+     * exist in release builds, so this is a no-op there.
+     */
+    fun installBundledDevCaCertificate(): Boolean {
+        if (!BuildConfig.DEBUG) return false
+
+        val certBytes = try {
+            context.assets.open(DEV_CA_CERT_ASSET_NAME).use { it.readBytes() }
+        } catch (e: FileNotFoundException) {
+            Logger.w("No bundled dev CA cert asset found: $DEV_CA_CERT_ASSET_NAME")
+            return false
+        } catch (e: Exception) {
+            Logger.e("Failed to read bundled dev CA cert: ${e.message}")
+            return false
+        }
+
+        return installCaCertificate(certBytes)
+    }
+
+    /**
+     * Device Owner apps can grant themselves a runtime permission without a
+     * user-facing prompt - used before reads that require e.g. READ_PHONE_STATE
+     * (IMEI) for the REQUEST_DEVICE_INFO command.
+     */
+    fun grantSelfRuntimePermission(permission: String): Boolean {
+        if (!isDeviceOwner()) {
+            Logger.w("Cannot grant self permission $permission. App is not Device Owner")
+            return false
+        }
+
+        return try {
+            dpm.setPermissionGrantState(
+                adminComponent,
+                context.packageName,
+                permission,
+                DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+            )
+        } catch (e: SecurityException) {
+            Logger.e("Failed to grant self permission $permission")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while granting self permission $permission")
+            false
+        }
+    }
+
+    //Backend command execution started here
+    fun lockNow(): Boolean {
+        if (!isDeviceOwner()) {
+            Logger.e("Cannot Lock Device. App is not Device Owner")
+            return false
+        }
+
+        return try {
+            dpm.lockNow()
+            Logger.i("Device locked")
+            true
+        } catch (e: SecurityException) {
+            Logger.e("Failed to lock device")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while locking device")
+            false
+        }
+    }
+
+    /**
+     * resetPassword() has been deprecated since API 26 and is rejected by
+     * many modern Android versions for a Device Owner when the user already
+     * has a lock screen credential - a false/exception result here is an
+     * honest failure, not a sign something else is wrong.
+     */
+    fun resetPassword(newPassword: String, flags: Int): Boolean {
+        if (!isDeviceOwner()) {
+            Logger.e("Cannot Reset Password. App is not Device Owner")
+            return false
+        }
+
+        return try {
+            @Suppress("DEPRECATION")
+            val result = dpm.resetPassword(newPassword, flags)
+            Logger.i("Reset Password result = $result")
+            result
+        } catch (e: SecurityException) {
+            Logger.e("Failed to reset password")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while resetting password")
+            false
+        }
+    }
+
+    /** dpm.wipeData() tears the device down essentially immediately - callers must ack before invoking this. */
+    fun wipeData(flags: Int): Boolean {
+        if (!isDeviceOwner()) {
+            Logger.e("Cannot Wipe Device. App is not Device Owner")
+            return false
+        }
+
+        return try {
+            dpm.wipeData(flags)
+            Logger.i("Wipe Data requested with flags = $flags")
+            true
+        } catch (e: SecurityException) {
+            Logger.e("Failed to wipe device")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while wiping device")
+            false
+        }
+    }
+
+    /** dpm.reboot() restarts the device essentially immediately - callers must ack before invoking this. */
+    fun rebootDevice(): Boolean {
+        if (!isDeviceOwner()) {
+            Logger.e("Cannot Reboot Device. App is not Device Owner")
+            return false
+        }
+
+        return try {
+            dpm.reboot(adminComponent)
+            Logger.i("Reboot requested")
+            true
+        } catch (e: SecurityException) {
+            Logger.e("Failed to reboot device")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while rebooting device")
+            false
+        }
+    }
+
+    /** clearApplicationUserData() is only available to a Device Owner from API 28 onward. */
+    suspend fun clearApplicationData(packageName: String): Boolean {
+        if (!isDeviceOwner()) {
+            Logger.e("Cannot Clear App Data. App is not Device Owner")
+            return false
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            Logger.w("Cannot Clear App Data. Requires API 28+, running ${Build.VERSION.SDK_INT}")
+            return false
+        }
+
+        return try {
+            suspendCancellableCoroutine { continuation ->
+                dpm.clearApplicationUserData(
+                    adminComponent,
+                    packageName,
+                    Executor { it.run() },
+                    { _, succeeded ->
+                        Logger.i("Clear App Data for $packageName succeeded = $succeeded")
+                        continuation.resume(succeeded)
+                    }
+                )
+            }
+        } catch (e: SecurityException) {
+            Logger.e("Failed to clear app data for $packageName")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while clearing app data for $packageName")
+            false
+        }
+    }
+
+    //Password policy started here
+    // setPasswordQuality/setPasswordMinimumLength are deprecated in favor of
+    // setRequiredPasswordComplexity() on newer Android, but that's a coarser
+    // 4-tier enum that can't represent the backend's exact minimumLength/
+    // quality contract - keeping the detailed API is deliberate, matching
+    // how resetPassword()'s deprecation was already handled this session.
+    @Suppress("DEPRECATION")
+    fun setPasswordQuality(quality: Int): Boolean {
+        if (!isDeviceOwner()) {
+            Logger.e("Cannot Set Password Quality. App is not Device Owner")
+            return false
+        }
+
+        return try {
+            dpm.setPasswordQuality(adminComponent, quality)
+            Logger.i("Password Quality set = $quality")
+            true
+        } catch (e: SecurityException) {
+            Logger.e("Failed to set password quality")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while setting password quality")
+            false
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    fun setPasswordMinimumLength(length: Int): Boolean {
+        if (!isDeviceOwner()) {
+            Logger.e("Cannot Set Password Minimum Length. App is not Device Owner")
+            return false
+        }
+
+        return try {
+            dpm.setPasswordMinimumLength(adminComponent, length)
+            Logger.i("Password Minimum Length set = $length")
+            true
+        } catch (e: SecurityException) {
+            Logger.e("Failed to set password minimum length")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while setting password minimum length")
+            false
+        }
+    }
+
+    fun setMaximumFailedPasswordsForWipe(count: Int): Boolean {
+        if (!isDeviceOwner()) {
+            Logger.e("Cannot Set Maximum Failed Passwords For Wipe. App is not Device Owner")
+            return false
+        }
+
+        return try {
+            dpm.setMaximumFailedPasswordsForWipe(adminComponent, count)
+            Logger.i("Maximum Failed Passwords For Wipe set = $count")
+            true
+        } catch (e: SecurityException) {
+            Logger.e("Failed to set maximum failed passwords for wipe")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while setting maximum failed passwords for wipe")
+            false
+        }
+    }
+
+    //App restrictions started here
+    fun setApplicationHidden(packageName: String, hidden: Boolean): Boolean {
+        if (!isDeviceOwner()) {
+            Logger.e("Cannot Change App Hidden State. App is not Device Owner")
+            return false
+        }
+
+        return try {
+            val success = dpm.setApplicationHidden(adminComponent, packageName, hidden)
+            Logger.i("Application Hidden Status for $packageName = $hidden, success=$success")
+            success
+        } catch (e: SecurityException) {
+            Logger.e("Failed to change hidden state for $packageName")
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while changing hidden state for $packageName")
+            false
+        }
+    }
+
+    /**
+     * Device Owner is exempt from Android's package-visibility restrictions,
+     * so this can query any installed package without a <queries> manifest
+     * declaration.
+     */
+    fun isPackageInstalled(packageName: String): Boolean {
+        return try {
+            context.packageManager.getPackageInfo(packageName, 0)
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        } catch (e: Exception) {
+            Logger.e("Unexpected error occurred while checking if $packageName is installed")
+            false
+        }
+    }
+
+    companion object {
+        private const val DEV_CA_CERT_ASSET_NAME = "emm_dev_cert.der"
     }
 }

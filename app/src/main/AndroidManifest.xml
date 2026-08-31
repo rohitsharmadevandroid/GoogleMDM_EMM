@@ -3,10 +3,19 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <!-- Device Owner provisioning a network from the backend's wifi policy. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+    <!-- Device Owner grants this to itself at runtime (no user prompt) to read
+         the IMEI for the REQUEST_DEVICE_INFO command. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <!-- Scanning a QR code to fill in the enrollment token. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
 
     <!-- Google requires a <queries> entry so the app can interact with Android Device Policy -->
     <queries>
-        <package android:name="com.google.android.app.work.clouddpc" />
+        <package android:name="com.google.android.apps.work.clouddpc" />
     </queries>
 
     <application
@@ -44,5 +53,26 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
+        <service
+            android:name=".enterprise.notification.MyNotificationReceiverService"
+            android:exported="true">
+
+            <meta-data
+                android:name="com.google.android.managementapi.notification.NotificationReceiverService.SERVICE_ENVIRONMENT"
+                android:value=""/>
+        </service>
+
+        <!-- GoogleMdmApplication implements Configuration.Provider and supplies
+             the HiltWorkerFactory itself via on-demand initialization. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 </manifest>

@@ -19,11 +19,11 @@ class EnrollmentViewModel @Inject constructor(
     private val deviceAdminManager: DeviceAdminManager,
     private val amapiEnvironmentManager: AmapiEnvironmentManager,
 ) : ViewModel() {
-    private val _uistate = MutableStateFlow(
+    private val _uiState = MutableStateFlow(
         EnrollmentUiState()
     )
 
-    val uiState: StateFlow<EnrollmentUiState> = _uistate.asStateFlow()
+    val uiState: StateFlow<EnrollmentUiState> = _uiState.asStateFlow()
 
     init {
         loadEnrollmentState()
@@ -32,7 +32,7 @@ class EnrollmentViewModel @Inject constructor(
     fun loadEnrollmentState() {
         viewModelScope.launch {
 
-            _uistate.update {
+            _uiState.update {
                 it.copy(
                     isLoading = true,
                     error = null,
@@ -43,12 +43,14 @@ class EnrollmentViewModel @Inject constructor(
             try {
                 val isDeviceOwner = deviceAdminManager.isDeviceOwner()
 
-                _uistate.update {
+                val isAdminActive = deviceAdminManager.isAdminActive()
+
+                _uiState.update {
                     it.copy(
                         isDeviceOwner = isDeviceOwner,
                         enrollmentStatus = when {
                             isDeviceOwner -> "DEVICE_OWNER"
-                            deviceAdminManager.isAdminActive() -> "DEVICE_ADMIN"
+                            isAdminActive -> "DEVICE_ADMIN"
                             else -> "NOT_ENROLLED"
                         }
                     )
@@ -56,7 +58,7 @@ class EnrollmentViewModel @Inject constructor(
                 checkAmapiEnvironment()
             } catch (e: Exception) {
                 Logger.e("Failed to load enrollment state: ${e.message}")
-                _uistate.update {
+                _uiState.update {
                     it.copy(
                         isLoading = false,
                         initialCheckComplete = true,
@@ -71,7 +73,7 @@ class EnrollmentViewModel @Inject constructor(
         val environment = amapiEnvironmentManager.getEnvironment()
 
         if (environment == null) {
-            _uistate.update{
+            _uiState.update{
                 it.copy(
                     amapiEnvironmentAvailable = false,
                     androidDevicePolicyState = "UNKNOWN",
@@ -95,11 +97,19 @@ class EnrollmentViewModel @Inject constructor(
         Logger.d("Enrollment ADP State = $state")
         Logger.d("Enrollment ADP Version = $version")
 
-        _uistate.update {
+        /* If AMAPI is already READY and UP_TO_DATE,
+            then environment is already prepared
+         */
+        val environementReady =
+            state == "READY" &&
+            version == "UP_TO_DATE"
+        _uiState.update {
             it.copy(
                 amapiEnvironmentAvailable = true,
                 androidDevicePolicyState = state,
                 androidDevicePolicyVersion = version,
+                isEnvironmentPrepared = environementReady,
+                enrollmentCompleted = environementReady,
                 isLoading = false,
                 initialCheckComplete = true,
                 error = null
@@ -109,51 +119,72 @@ class EnrollmentViewModel @Inject constructor(
 
     fun prepareEnvironment() {
         viewModelScope.launch {
-            _uistate.update {
+            _uiState.update {
                 it.copy(
                     isPreparingEnvironment = true,
-                    error = null
+                    error = null,
+                    enrollmentCompleted = false
                 )
             }
 
             try {
+                Logger.d(
+                    "Starting AMAPI Environment preparation"
+                )
                 val response = amapiEnvironmentManager.prepareEnvironment()
 
-                if(response != null) {
+                if(response == null) {
                     Logger.d(
                         "AMAPI Environment preparation successfully"
                     )
 
-                    Logger.d(
-                        "AMAPI Prepare Environment Response  = $response"
-                    )
-                    _uistate.update {
-                        it.copy(
-                            isPreparingEnvironment = false,
-                            isEnvironmentPrepared = true,
-                        )
-                    }
-                    // Read the Environment again after preparation
-                    checkAmapiEnvironment()
-                } else {
-                    Logger.e(
-                        "AMAPI Environment preparation failed"
-                    )
+                    _uiState.update {
 
-                    _uistate.update {
                         it.copy(
                             isPreparingEnvironment = false,
                             isEnvironmentPrepared = false,
+                            enrollmentCompleted = false,
                             error = "Failed to Prepare AMAPI Environment"
                         )
                     }
+                    return@launch
                 }
+                Logger.d(
+                    "AMAPI Prepare Environment Response  = $response"
+                )
+                //Read Environment Again after preparation
+                val environment = amapiEnvironmentManager.getEnvironment()
+                val adpEnvironment = environment?.androidDevicePolicyEnvironment
+                val state = adpEnvironment?.state?.toString()
+                val version = adpEnvironment?.version?.toString()
+
+                Logger.d("Final ADP State = $state")
+                Logger.d("Final ADP Version = $version")
+
+                val enrollmentSuccessful =
+                    state == "READY" &&
+                    version == "UP_TO_DATE"
+                Logger.d(
+                    "AMAPI environment ready = $enrollmentSuccessful"
+                )
+                 _uiState.update {
+
+                     it.copy(
+                         isPreparingEnvironment = false,
+                         isEnvironmentPrepared = enrollmentSuccessful,
+                         enrollmentCompleted = enrollmentSuccessful,
+                         androidDevicePolicyState = state ?: "UNKNOWN",
+                         androidDevicePolicyVersion = version ?: "UNKNOWN",
+                         error =
+                             if (enrollmentSuccessful) null
+                             else "Failed to Prepare AMAPI Environment"
+                     )
+                 }
             } catch (e: Exception) {
                 Logger.e("Failed to prepare AMAPI Environment: ${e.message}")
-                _uistate.update {
+                _uiState.update {
                     it.copy(
                         isPreparingEnvironment = false,
-                        isEnvironmentPrepared = false,
                         error = e.message
                     )
                 }

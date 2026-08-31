@@ -14,12 +14,20 @@ class KioskManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val kioskPreferences: KioskPreferences
 ) {
-    fun enabledKioskMode(): Boolean {
-        val success =  deviceAdminManager.setLockTaskPackages(
-            listOf(context.packageName)
+    /**
+     * @param allowedPackageNames Packages permitted to enter lock task mode.
+     * Defaults to this DPC app itself, matching the Dashboard's manual
+     * toggle. A backend-driven policy can instead pass a specific business
+     * app's package name(s) to lock the device to that app - though this
+     * app will only actually enter lock task mode itself (via
+     * KioskController.startKiosk()) when its own package is included here.
+     */
+    fun enabledKioskMode(allowedPackageNames: List<String> = listOf(context.packageName)): Boolean {
+        val success = deviceAdminManager.setLockTaskPackages(
+            allowedPackageNames
         )
 
-        Logger.d("Enabled Kiosk Mode = $success")
+        Logger.d("Enabled Kiosk Mode for $allowedPackageNames = $success")
         if(success) {
             kioskPreferences.setKioskEnabled(true)
         }

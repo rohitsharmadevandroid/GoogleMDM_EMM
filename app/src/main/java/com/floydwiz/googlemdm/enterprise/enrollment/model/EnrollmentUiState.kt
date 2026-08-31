@@ -9,6 +9,7 @@ data class EnrollmentUiState(
     val isPreparingEnvironment: Boolean = false,
     val isEnvironmentPrepared: Boolean = false,
     val enrollmentStatus: String = "NOT_ENROLLED",
+    val enrollmentCompleted: Boolean = false,
     val error: String? = null,
     val initialCheckComplete: Boolean = false
 )

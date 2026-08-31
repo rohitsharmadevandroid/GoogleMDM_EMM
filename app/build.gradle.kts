@@ -21,6 +21,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Local dev EMM backend. Reached via `adb reverse tcp:8080 tcp:8080`
+        // so the device/emulator can use the literal "localhost" hostname
+        // the backend's dev TLS cert and CORS/host checks expect.
+        buildConfigField("String", "EMM_BASE_URL", "\"https://localhost:8080/\"")
     }
 
     buildTypes {
@@ -50,6 +55,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.1.0")
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -71,6 +78,11 @@ dependencies {
 
     //WorkManager
     implementation("androidx.work:work-runtime-ktx:2.11.0")
+    implementation("androidx.hilt:hilt-work:1.3.0")
+    ksp("androidx.hilt:hilt-compiler:1.3.0")
+
+    //Secure storage (Keystore-backed EncryptedSharedPreferences)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     //Timber
     implementation("com.jakewharton.timber:timber:5.0.1")
@@ -87,4 +99,7 @@ dependencies {
 
     //Android Management API SDK
     implementation("com.google.android.libraries.enterprise.amapi:amapi:1.8.2")
+
+    //QR code scanning for enrollment (pure Java/Camera1-2, no Play Services dependency)
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 }

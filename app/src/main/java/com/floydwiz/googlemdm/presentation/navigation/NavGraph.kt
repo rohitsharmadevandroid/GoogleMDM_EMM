@@ -17,36 +17,22 @@ fun NavGraph(
     kioskController: KioskController,
     enrollmentViewModel: EnrollmentViewModel = hiltViewModel()
 ) {
-    val uiState = enrollmentViewModel.uiState.collectAsState().value
-
-    if (!uiState.initialCheckComplete) {
-        return
-    }
-
-    val startDestination = if(
-        uiState.isDeviceOwner &&
-        uiState.isEnvironmentPrepared
-    ) {
-        Routes.DASHBOARD
-    } else {
-        Routes.ENROLLMENT
-    }
    NavHost(
        navController = navController,
-       startDestination = startDestination
+       startDestination = Routes.ENROLLMENT
    ) {
+       composable(Routes.ENROLLMENT) {
+           EnrollmentScreen(
+               navController = navController,
+               enrollmentViewModel = enrollmentViewModel
+           )
+       }
+
        composable(Routes.DASHBOARD) {
            DashboardScreen(
                kioskController = kioskController,
                onEnrollmentClick = {
                    navController.navigate(Routes.ENROLLMENT)
-               }
-           )
-       }
-       composable(Routes.ENROLLMENT) {
-           EnrollmentScreen(
-               onEnrollmentClick = {
-                   enrollmentViewModel.loadEnrollmentState()
                }
            )
        }
