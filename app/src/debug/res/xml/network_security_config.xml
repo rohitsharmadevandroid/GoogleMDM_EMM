@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    DEBUG BUILD ONLY (app/src/debug). Not merged into release builds.
+
+    Lets the app trust the local EMM backend's self-signed development TLS
+    certificate, scoped only to the local-dev hostnames. This does NOT trust
+    all certificate authorities and must never be copied into a production
+    network security config.
+
+    Setup: install the backend's dev CA/cert as a user certificate on the
+    emulator/device (Settings > Security > Install a certificate), then run
+    `adb reverse tcp:8080 tcp:8080` so the device can reach the backend at
+    https://localhost:8080 exactly as the DPC contract specifies.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

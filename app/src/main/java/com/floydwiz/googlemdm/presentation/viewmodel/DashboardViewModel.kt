@@ -178,10 +178,10 @@ class DashboardViewModel @Inject constructor(
                     "AMAPI Prepare Environment Status = ${response.environment}"
                 )
 
-                val environmentReady =
+                val environment =
                     amapiEnvironmentManager.getEnvironment()
 
-                if (environmentReady) {
+                if (environment != null) {
                     Logger.d(
                         "AMAPI Environment check successfully"
                     )
