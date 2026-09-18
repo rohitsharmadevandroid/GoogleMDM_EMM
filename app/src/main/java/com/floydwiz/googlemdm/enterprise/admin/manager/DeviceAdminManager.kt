@@ -1,12 +1,17 @@
 package com.floydwiz.googlemdm.enterprise.admin.manager
 
+import android.app.PendingIntent
 import android.app.admin.DevicePolicyManager
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.UserManager
+import androidx.core.content.ContextCompat
 import com.floydwiz.googlemdm.BuildConfig
 import com.floydwiz.googlemdm.core.logger.Logger
 import com.floydwiz.googlemdm.enterprise.admin.receiver.MyDeviceAdminReceiver
@@ -638,6 +643,50 @@ class DeviceAdminManager @Inject constructor(
         } catch (e: Exception) {
             Logger.e("Unexpected error occurred while changing hidden state for $packageName")
             false
+        }
+    }
+
+    /**
+     * Silently removes a package with no user confirmation - the same
+     * Device Owner exemption PackageInstaller.commit() gets for installs
+     * (USER_ACTION_NOT_REQUIRED) applies to uninstall(). Fire-and-forget:
+     * the result only gets logged, callers (e.g. a BroadcastReceiver
+     * reacting to a blocked sideload) don't need to await it.
+     */
+    fun silentlyUninstall(packageName: String) {
+        if (!isDeviceOwner()) {
+            Logger.e("Cannot uninstall $packageName. App is not Device Owner")
+            return
+        }
+
+        val action = "com.floydwiz.googlemdm.UNINSTALL_RESULT.$packageName"
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context, intent: Intent) {
+                receiverContext.unregisterReceiver(this)
+                val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                Logger.i("Silent uninstall of $packageName: status=$status")
+            }
+        }
+
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(action),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            packageName.hashCode(),
+            Intent(action).setPackage(context.packageName),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+
+        try {
+            context.packageManager.packageInstaller.uninstall(packageName, pendingIntent.intentSender)
+        } catch (e: Exception) {
+            context.unregisterReceiver(receiver)
+            Logger.e("Failed to request uninstall of $packageName: ${e.message}")
         }
     }
 

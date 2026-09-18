@@ -8,5 +8,5 @@ import com.floydwiz.googlemdm.data.remote.CustomDpcPolicyPayloadDto
  * real DevicePolicyManager chain.
  */
 interface PolicyApplier {
-    fun apply(payload: CustomDpcPolicyPayloadDto)
+    suspend fun apply(payload: CustomDpcPolicyPayloadDto)
 }

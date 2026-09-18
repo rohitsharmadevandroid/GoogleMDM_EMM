@@ -6,7 +6,7 @@ import com.floydwiz.googlemdm.enterprise.policy.PolicyApplier
 class FakePolicyApplier : PolicyApplier {
     val appliedPayloads = mutableListOf<CustomDpcPolicyPayloadDto>()
 
-    override fun apply(payload: CustomDpcPolicyPayloadDto) {
+    override suspend fun apply(payload: CustomDpcPolicyPayloadDto) {
         appliedPayloads += payload
     }
 }

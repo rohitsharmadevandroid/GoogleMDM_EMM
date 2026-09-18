@@ -1,5 +1,6 @@
 package com.floydwiz.googlemdm.presentation.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.floydwiz.googlemdm.core.logger.Logger
@@ -7,9 +8,11 @@ import com.floydwiz.googlemdm.data.model.CheckInResult
 import com.floydwiz.googlemdm.data.model.EnrollmentResult
 import com.floydwiz.googlemdm.data.repository.EmmRepository
 import com.floydwiz.googlemdm.enterprise.admin.manager.DeviceAdminManager
+import com.floydwiz.googlemdm.enterprise.apprestrictions.service.BlockedPackageEnforcementService
 import com.floydwiz.googlemdm.sync.CheckInScheduler
 import com.google.gson.JsonParser
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,7 +48,8 @@ data class EmmUiState(
 class EmmViewModel @Inject constructor(
     private val emmRepository: EmmRepository,
     private val checkInScheduler: CheckInScheduler,
-    private val deviceAdminManager: DeviceAdminManager
+    private val deviceAdminManager: DeviceAdminManager,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(loadInitialState())
@@ -108,6 +112,7 @@ class EmmViewModel @Inject constructor(
                 is EnrollmentResult.Success -> {
                     Logger.i("EMM enrollment succeeded")
                     checkInScheduler.ensureScheduled(result.checkInIntervalSeconds)
+                    BlockedPackageEnforcementService.start(context)
                     _uiState.update {
                         it.copy(
                             isEnrolling = false,

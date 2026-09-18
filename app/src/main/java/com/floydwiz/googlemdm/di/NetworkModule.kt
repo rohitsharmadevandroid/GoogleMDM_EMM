@@ -7,7 +7,6 @@ import com.floydwiz.googlemdm.data.local.DeviceInfoProvider
 import com.floydwiz.googlemdm.data.local.SecureDeviceCredentials
 import com.floydwiz.googlemdm.data.remote.ApiClient
 import com.floydwiz.googlemdm.data.remote.AuthInterceptor
-import com.floydwiz.googlemdm.data.remote.DevHostnameOverride
 import com.floydwiz.googlemdm.data.remote.EmmApiService
 import dagger.Binds
 import dagger.Module
@@ -43,23 +42,13 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
+        // Standard TLS verification (network_security_config.xml scopes CA
+        // trust to the dev backend's hosts in debug builds) - the backend's
+        // dev cert has a real SAN now, so no hostname-verifier/pinning
+        // workaround is needed.
         return ApiClient.buildOkHttpClient(
             authInterceptor = authInterceptor,
-            enableLogging = BuildConfig.DEBUG,
-            devHostnameOverride = if (BuildConfig.DEBUG) {
-                // The local dev backend's self-signed cert has no SAN, only a CN,
-                // so standard hostname verification correctly rejects it. We can't
-                // change the backend's cert, so debug builds pin to this exact
-                // known cert instead of disabling verification generally.
-                // Regenerate this pin (see docs/emm-backend-integration-test-plan.md)
-                // if the backend's dev cert is ever regenerated.
-                DevHostnameOverride(
-                    hosts = setOf("localhost", "10.0.2.2"),
-                    certificateSha256Pin = "sha256/ZBDrNath2tZT00LoGtGXDxKSYKK1JTuD33jSYDaU14U="
-                )
-            } else {
-                null
-            }
+            enableLogging = BuildConfig.DEBUG
         )
     }
 

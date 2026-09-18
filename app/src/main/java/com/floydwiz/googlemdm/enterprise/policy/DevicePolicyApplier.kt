@@ -29,7 +29,7 @@ class DevicePolicyApplier @Inject constructor(
     private val appRestrictionsManager: AppRestrictionsManager
 ) : PolicyApplier {
 
-    override fun apply(payload: CustomDpcPolicyPayloadDto) {
+    override suspend fun apply(payload: CustomDpcPolicyPayloadDto) {
         val results = listOf(
             PolicyType.CAMERA to policyHandler.setPolicy(PolicyType.CAMERA, payload.cameraDisabled),
             PolicyType.FACTORY_RESET to policyHandler.setPolicy(PolicyType.FACTORY_RESET, payload.factoryResetDisabled),
@@ -89,7 +89,8 @@ class DevicePolicyApplier @Inject constructor(
         }
     }
 
-    private fun applyAppRestrictions(appRestrictions: List<AppRestrictionPayloadDto>) {
+    private suspend fun applyAppRestrictions(appRestrictions: List<AppRestrictionPayloadDto>) {
+        appRestrictionsManager.syncBlockedPackages(appRestrictions)
         if (appRestrictions.isEmpty()) return
 
         val failed = appRestrictions.filterNot { appRestrictionsManager.apply(it) }

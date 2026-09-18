@@ -7,6 +7,7 @@ import com.floydwiz.googlemdm.BuildConfig
 import com.floydwiz.googlemdm.core.constants.AppConstants
 import com.floydwiz.googlemdm.core.logger.Logger
 import com.floydwiz.googlemdm.data.repository.EmmRepository
+import com.floydwiz.googlemdm.enterprise.apprestrictions.service.BlockedPackageEnforcementService
 import com.floydwiz.googlemdm.sync.CheckInScheduler
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
@@ -39,6 +40,11 @@ class GoogleMdmApplication : Application(), Configuration.Provider {
         // (e.g. after a process restart or device reboot).
         if (emmRepository.isEnrolled) {
             checkInScheduler.ensureScheduled(emmRepository.checkInIntervalSeconds)
+
+            // Keeps the process out of Android's background-execution-limits
+            // bucket, which otherwise silently drops BlockedPackageInstallReceiver's
+            // PACKAGE_ADDED broadcast once the app has been idle a while.
+            BlockedPackageEnforcementService.start(this)
         }
     }
 }

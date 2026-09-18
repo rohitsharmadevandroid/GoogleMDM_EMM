@@ -10,6 +10,19 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
     <!-- Scanning a QR code to fill in the enrollment token. -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Silently uninstalling a BLOCKED sideload the app didn't install itself. -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES"/>
+    <!-- Package-visibility filtering (API 30+) otherwise silently drops the
+         PACKAGE_ADDED broadcast for any package this app hasn't declared a
+         <queries> entry for - BLOCKED entries name arbitrary packages not
+         known at build time, so a static <queries> list can't cover them. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission"/>
+    <!-- Keeps BlockedPackageInstallReceiver's process alive so its
+         PACKAGE_ADDED broadcast isn't dropped by background-execution limits. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
 
@@ -53,6 +66,23 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
+        <receiver
+            android:name=".enterprise.apprestrictions.receiver.BootCompletedReceiver"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <service
+            android:name=".enterprise.apprestrictions.service.BlockedPackageEnforcementService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Enforcing device-owner app restrictions (BLOCKED package removal)" />
+        </service>
         <service
             android:name=".enterprise.notification.MyNotificationReceiverService"
             android:exported="true">

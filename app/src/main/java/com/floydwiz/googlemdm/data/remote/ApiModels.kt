@@ -68,7 +68,10 @@ data class PasswordPolicyPayloadDto(
 data class AppRestrictionPayloadDto(
     @SerializedName("packageName") val packageName: String,
     // One of: REQUIRED, BLOCKED, AVAILABLE
-    @SerializedName("installType") val installType: String
+    @SerializedName("installType") val installType: String,
+    // Only ever populated when installType == REQUIRED and an admin supplied a source.
+    @SerializedName("apkUrl") val apkUrl: String? = null,
+    @SerializedName("apkSha256") val apkSha256: String? = null
 )
 
 /** A single network - the backend model supports only one per policy, not a list. */

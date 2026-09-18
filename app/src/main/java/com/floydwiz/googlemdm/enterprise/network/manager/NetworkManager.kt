@@ -96,13 +96,17 @@ class NetworkManager @Inject constructor(
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 val result = wifiManager.addNetworkPrivileged(config)
-                val success = result.statusCode == WifiManager.AddNetworkResult.STATUS_SUCCESS
+                val added = result.statusCode == WifiManager.AddNetworkResult.STATUS_SUCCESS
+                // addNetworkPrivileged only registers the config - it doesn't join it.
+                // enableNetwork(id, true) remains fully functional for Device Owner apps
+                // (unlike for regular apps, where it's a no-op from targetSdk 29+).
+                val success = added && wifiManager.enableNetwork(result.networkId, true)
                 Logger.i("Wi-Fi network $ssid added via addNetworkPrivileged, success=$success")
                 success
             } else {
                 val networkId = wifiManager.addNetwork(config)
                 val success = networkId != -1 &&
-                    wifiManager.enableNetwork(networkId, false) &&
+                    wifiManager.enableNetwork(networkId, true) &&
                     wifiManager.saveConfiguration()
                 Logger.i("Wi-Fi network $ssid added via legacy addNetwork, success=$success")
                 success
