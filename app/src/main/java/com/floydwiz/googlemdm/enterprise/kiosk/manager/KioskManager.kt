@@ -5,6 +5,12 @@ import com.floydwiz.googlemdm.core.logger.Logger
 import com.floydwiz.googlemdm.enterprise.admin.manager.DeviceAdminManager
 import com.floydwiz.googlemdm.enterprise.kiosk.KioskPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,14 +20,42 @@ class KioskManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val kioskPreferences: KioskPreferences
 ) {
-    fun enabledKioskMode(): Boolean {
-        val success =  deviceAdminManager.setLockTaskPackages(
-            listOf(context.packageName)
+    private val _kioskModeChanges = MutableSharedFlow<Boolean>(extraBufferCapacity = 1)
+
+    /**
+     * Emits whenever kiosk mode is enabled/disabled - including when a
+     * backend check-in applies it from a background WorkManager coroutine,
+     * which can't call Activity.startLockTask() itself. MainActivity
+     * collects this to engage/release lock task immediately if it's already
+     * in the foreground when the change happens (onResume alone only
+     * catches the next foreground *transition*, not a change that arrives
+     * while already resumed).
+     */
+    val kioskModeChanges: SharedFlow<Boolean> = _kioskModeChanges.asSharedFlow()
+
+    private val _kioskModeState = MutableStateFlow(kioskPreferences.isKioskEnabled())
+
+    /** Live kiosk on/off state - lets the UI (AppNavigation) switch to the kiosk screen immediately. */
+    val kioskModeState: StateFlow<Boolean> = _kioskModeState.asStateFlow()
+
+    /**
+     * @param allowedPackageNames Packages permitted to enter lock task mode.
+     * Defaults to this DPC app itself, matching the Dashboard's manual
+     * toggle. A backend-driven policy can instead pass a specific business
+     * app's package name(s) to lock the device to that app - though this
+     * app will only actually enter lock task mode itself (via
+     * KioskController.startKiosk()) when its own package is included here.
+     */
+    fun enabledKioskMode(allowedPackageNames: List<String> = listOf(context.packageName)): Boolean {
+        val success = deviceAdminManager.setLockTaskPackages(
+            allowedPackageNames
         )
 
-        Logger.d("Enabled Kiosk Mode = $success")
+        Logger.d("Enabled Kiosk Mode for $allowedPackageNames = $success")
         if(success) {
             kioskPreferences.setKioskEnabled(true)
+            _kioskModeChanges.tryEmit(true)
+            _kioskModeState.value = true
         }
         return success
     }
@@ -32,12 +66,14 @@ class KioskManager @Inject constructor(
         Logger.d("Disabled Kiosk Mode = $success")
         if(success) {
             kioskPreferences.setKioskEnabled(false)
+            _kioskModeChanges.tryEmit(false)
+            _kioskModeState.value = false
         }
         return success
     }
 
     fun isKioskModeEnabled(): Boolean {
-        return kioskPreferences.isKioskEnabled()
+        return _kioskModeState.value
     }
 
     fun isPackageAllowed(
