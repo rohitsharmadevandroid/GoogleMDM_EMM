@@ -9,22 +9,18 @@
 
     Setup: install the backend's dev CA/cert on-device via the app's own
     "Install Dev Backend CA Cert (Debug Only)" button (Device Owner installs
-    it silently, no Settings flow needed). EMM_BASE_URL points at this
-    machine's LAN IP directly over Wi-Fi - no adb reverse tunnel required,
-    which is why that IP is listed here alongside localhost/10.0.2.2. The
-    dev cert's SAN must cover whichever of these are actually used; update
-    both here and in the dev cert if this machine's LAN IP changes (DHCP).
+    it silently, no Settings flow needed), then run
+    `adb reverse tcp:8080 tcp:8080` so the device can reach the backend at
+    https://localhost:8080.
 
     Cleartext is also permitted here for these same hosts only, so a plain
-    HTTP file server (e.g. for testing REQUIRED app apkUrl downloads)
-    doesn't need its own TLS setup.
+    HTTP file server on a reversed loopback port (e.g. for testing REQUIRED
+    app apkUrl downloads) doesn't need its own TLS setup.
 -->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">10.0.2.2</domain>
-        <domain includeSubdomains="false">192.168.21.121</domain>
-        <domain includeSubdomains="false">192.168.20.180</domain>
         <trust-anchors>
             <certificates src="system" />
             <certificates src="user" />

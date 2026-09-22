@@ -22,12 +22,9 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Local dev EMM backend, reached over Wi-Fi directly by this machine's
-        // LAN IP - no adb reverse tunnel needed, so it survives the device's
-        // adb connection resetting (which happens constantly). The dev TLS
-        // cert's SAN covers this IP; update both here and in the dev cert if
-        // this machine's own LAN IP changes (DHCP).
-        buildConfigField("String", "EMM_BASE_URL", "\"https://192.168.21.121:8080/\"")
+        // Local dev EMM backend. Reached via `adb reverse tcp:8080 tcp:8080`
+        // so the device/emulator can use the literal "localhost" hostname.
+        buildConfigField("String", "EMM_BASE_URL", "\"https://localhost:8080/\"")
     }
 
     buildTypes {
